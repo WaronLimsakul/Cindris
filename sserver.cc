@@ -5,6 +5,7 @@
 #include <string.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <netinet/in.h>
 
 #define LISTEN_BACKLOG 10
@@ -26,6 +27,67 @@ void do_something(int connfd) {
 
     char write_buff[] = "hello, world";
     int bytes_sent = send(connfd, write_buff, strlen(write_buff), 0);
+}
+
+static int32_t recv_all(int connfd, char *buff, size_t bytes) {
+    size_t bytes_left = bytes; 
+    while (bytes_left != 0) {
+        size_t bytes_read_sofar = bytes - bytes_left;
+        ssize_t bytes_read = recv(connfd, buff + bytes_read_sofar, bytes_left, 0);
+        if (bytes_read == -1) {
+            perror("recv_all");
+            return -1;
+        }
+        bytes_left -= bytes_read;
+    }
+    return 0;
+}
+
+static int32_t send_all(int connfd, char *msg, size_t bytes) {
+    size_t bytes_left = bytes; 
+    while (bytes_left != 0) {
+        size_t bytes_read_sofar = bytes - bytes_left;
+        ssize_t bytes_read = send(connfd, msg + bytes_read_sofar, bytes_left, 0);
+        if (bytes_read == -1) {
+            perror("send_all");
+            return -1;
+        }
+        bytes_left -= bytes_read;
+    }
+    return 0;
+}
+
+int32_t reqres(int connfd) {
+    const uint32_t max_msg_len = 4095;
+    char msg_len_buff[4];
+    errno = 0; // at the start of each function, we should set errno 0
+    uint32_t read_res = recv_all(connfd, msg_len_buff, sizeof(uint32_t));
+    if (read_res == -1) {
+        fprintf(stderr, "recv_all: fail");
+        return -1;
+    }
+    uint32_t msg_len;
+    memcpy(&msg_len, msg_len_buff, sizeof(uint32_t));
+    if (msg_len > max_msg_len) {
+        fprintf(stderr, "message too long");
+        return -1;
+    }
+
+    char client_msg[max_msg_len + 1];
+    read_res = recv_all(connfd, client_msg, msg_len);
+    if (read_res == -1) {
+        fprintf(stderr, "recv_all: fail");
+        return -1;
+    }
+    client_msg[msg_len] = '\0';
+    printf("client says: %s\n", client_msg);
+    
+    char reply[] = "roger that!";
+    size_t reply_len = sizeof(reply);
+    char write_buff[reply_len + 4];
+    memcpy(write_buff, &reply_len, 4);
+    memcpy(&write_buff[4], reply, reply_len);
+    return send_all(connfd, write_buff, sizeof(write_buff));
 }
 
 int main(void) {
@@ -67,7 +129,12 @@ int main(void) {
             continue;
         }
 
-        do_something(connfd);
+        while (true) {
+            int32_t rv = reqres(connfd);
+            if (rv == -1) {
+                break;
+            }
+        }
         close(connfd);
     }
 }
