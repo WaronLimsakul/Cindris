@@ -1,11 +1,12 @@
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -Wall -O2 -g -Iinclude
+CXXFLAGS = -Wall -Wextra -O2 -g -Iinclude
 
 # Directories
 SRC_DIR = src
 UTILS_DIR = utils
 BUILD_DIR = build
+BIN_DIR = bin
 INCLUDE_DIR = include
 
 # Find source files
@@ -19,19 +20,23 @@ UTILS_OBJ = $(UTILS_SRC:$(UTILS_DIR)/%.cc=$(BUILD_DIR)/%.o)
 ALL_OBJ = $(MAIN_OBJ) $(UTILS_OBJ)
 
 # Generate binary names (one for each .cc file in src/)
-BINARIES = $(MAIN_SRC:$(SRC_DIR)/%.cc=%)
+BINARIES = $(MAIN_SRC:$(SRC_DIR)/%.cc=$(BIN_DIR)/%)
 
 # Default target
 .PHONY: all clean
 
-all: $(BUILD_DIR) $(BINARIES)
+all: $(BUILD_DIR) $(BIN_DIR) $(BINARIES)
 
 # Create build directory
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
+# Create bin directory
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
+
 # Rule to build binaries (each main .cc file becomes a binary)
-%: $(SRC_DIR)/%.cc $(UTILS_OBJ) | $(BUILD_DIR)
+$(BIN_DIR)/%: $(SRC_DIR)/%.cc $(UTILS_OBJ) | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $< $(UTILS_OBJ)
 
 # Rule to build object files from src/
@@ -45,7 +50,7 @@ $(BUILD_DIR)/%.o: $(UTILS_DIR)/%.cc | $(BUILD_DIR)
 # Clean up generated files
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -f $(BINARIES)
+	rm -rf $(BIN_DIR)
 
 # Show help
 help:

@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
+#include "util.h"
+
 #define LISTEN_BACKLOG 10
 #define READ_BUFF_MAXLEN 128
 
@@ -26,42 +28,14 @@ void do_something(int connfd) {
     printf("client: %s\n", read_buff);
 
     char write_buff[] = "hello, world";
-    int bytes_sent = send(connfd, write_buff, strlen(write_buff), 0);
-}
-
-static int32_t recv_all(int connfd, char *buff, size_t bytes) {
-    size_t bytes_left = bytes; 
-    while (bytes_left != 0) {
-        size_t bytes_read_sofar = bytes - bytes_left;
-        ssize_t bytes_read = recv(connfd, buff + bytes_read_sofar, bytes_left, 0);
-        if (bytes_read == -1) {
-            perror("recv_all");
-            return -1;
-        }
-        bytes_left -= bytes_read;
-    }
-    return 0;
-}
-
-static int32_t send_all(int connfd, char *msg, size_t bytes) {
-    size_t bytes_left = bytes; 
-    while (bytes_left != 0) {
-        size_t bytes_read_sofar = bytes - bytes_left;
-        ssize_t bytes_read = send(connfd, msg + bytes_read_sofar, bytes_left, 0);
-        if (bytes_read == -1) {
-            perror("send_all");
-            return -1;
-        }
-        bytes_left -= bytes_read;
-    }
-    return 0;
+    send(connfd, write_buff, strlen(write_buff), 0);
 }
 
 int32_t reqres(int connfd) {
     const uint32_t max_msg_len = 4095;
     char msg_len_buff[4];
     errno = 0; // at the start of each function, we should set errno 0
-    uint32_t read_res = recv_all(connfd, msg_len_buff, sizeof(uint32_t));
+    int32_t read_res = recv_all(connfd, msg_len_buff, sizeof(uint32_t));
     if (read_res == -1) {
         fprintf(stderr, "recv_all: fail");
         return -1;
