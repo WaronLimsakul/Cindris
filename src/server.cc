@@ -15,11 +15,14 @@
 #include <fcntl.h>
 
 #include <vector>
+#include <string>
+#include <map>
 
 #include "buffer.h"
 
 const int server_back_log = 10;
 const size_t max_msg_len = 32 << 20;
+static std::map<std::string, std::string> cache;
 
 struct Conn {
     int fd = -1;
@@ -29,6 +32,18 @@ struct Conn {
 
     Buffer incoming;
     Buffer outgoing;
+};
+
+enum StatusCode : uint32_t {
+    RES_OK,
+    RES_NOTFOUND,
+    RES_ERR,
+};
+
+struct Response {
+    StatusCode status = RES_OK;
+    uint8_t *data = NULL;
+    size_t data_len = 0;
 };
 
 static void sock_set_nonblock(int fd) {
@@ -48,37 +63,113 @@ static void sock_set_nonblock(int fd) {
     }
 }
 
-// 	1. Try to parse accumulated buffer
-// 	2. Process the parse message
-//  3. if the message is already complete 
-//      - echo is back to outgoing vector
-// 	    - Remove the message from Conn::incoming
-// 	4. if not, just left it like that
+// 	- Have `int parse_req(req, output)` return 0, -1 if fail
+// 	- so basically just parse each word into a vector 
+static ssize_t parse_req(uint8_t *req, size_t buff_len,std::vector<std::string> &cmd) {
+    // check num words
+    assert(buff_len >= 4);
+    uint32_t num_words;
+    memcpy(&num_words, req, 4);
+
+    cmd.clear();
+    
+    size_t bytes_read = 4; // already read the first 4 bytes
+    uint32_t cur_word_len;
+    size_t wc = 0;
+    for (; wc < num_words; wc++) {
+        // check bytes left > prefix len
+        size_t bytes_left = buff_len - bytes_read;
+        if (bytes_left < 4) break;
+
+        // check bytes left > word len
+        uint8_t *cursor = req + bytes_read;
+        memcpy(&cur_word_len, cursor, 4);
+        if (cur_word_len > bytes_left - 4) break;
+
+        // push to cmd
+        std::string cur_word = std::string((char *)cursor, cur_word_len);
+        cmd.push_back(cur_word);
+
+        bytes_read += cur_word_len + 4;
+    }
+    
+    // check process complete
+    if (wc != num_words) return -1;
+    return bytes_read; // entire len of req
+}
+
+static void do_cmd(std::vector<std::string> cmd, Response &res) {
+    if (cmd.size() == 2 && cmd[0] == "get") {
+        auto item = cache.find(cmd[1]);
+        if (item == cache.end()) {
+            res.status = RES_NOTFOUND;
+            return;
+        }
+        std::string &val = item->second; // "first" is the key 
+        res.data = (uint8_t *)val.data(); // overwrite entire data
+        res.data_len = val.size();
+    } else if (cmd.size() == 3 && cmd[0] == "set") {
+        std::string key = cmd[1], val = cmd[2];
+        cache[key].swap(val); // faster than cache[key] = val
+    } else if (cmd.size() == 2 && cmd[0]== "del") {
+        cache.erase(cmd[1]);
+    } else {
+        res.status = RES_ERR; // invalid command
+        return;
+    }
+    res.status = RES_OK;
+}
+
+// - have `make_res(out_buffer, res)`
+// - write response length first
+// - then write statuscode
+// - then write message
+static void make_res(Buffer &output, Response res) {
+    uint32_t msg_len = 4 + res.data_len;
+    output.append((uint8_t *)&msg_len, 4);
+    output.append((uint8_t *)&res.status, 4);
+    output.append(res.data, res.data_len);
+}
+
+// 1. Parse the command to some struct <- we use `vector<string>`
+// 2. Create response based on that struct
+// 3. Append the response back to output buffer
 static bool try_one_request(Conn *conn) {
     if (conn->incoming.size() < 4) {
         return false;
     } 
-
-    uint32_t msg_len;
-    memcpy(&msg_len, conn->incoming.data(), 4);
-    if (msg_len > max_msg_len) {
-        fprintf(stderr, "msg too long\n");
-        conn->want_close = true;
+    //
+    // uint32_t req_len;
+    // memcpy(&req_len, conn->incoming.data(), 4);
+    // if (req_len > max_msg_len) {
+    //     fprintf(stderr, "msg too long\n");
+    //     conn->want_close = true;
+    //     return false;
+    // }
+    // // messaeg not ready
+    // if (req_len > conn->incoming.size() - 4) {
+    //     return false;
+    // }
+    //
+    // uint8_t *req = conn->incoming.data() + 4;
+    // printf("client says: len: %u | msg: %.*s\n", msg_len, 
+    //        msg_len < 100 ? msg_len : 100, msg);
+    // // echo the message back to connection using outgoing buffer
+    // conn->outgoing.append((uint8_t *)&msg_len, 4);
+    // conn->outgoing.append(msg, msg_len);
+    //
+    // conn->incoming.consume(msg_len + 4);
+    uint8_t *req = conn->incoming.data();
+    std::vector<std::string> cmd;
+    size_t read_buff_size = conn->incoming.size();
+    ssize_t req_len;
+    if ((req_len = parse_req(req, read_buff_size, cmd)) <= 0) {
         return false;
     }
-    // messaeg not ready
-    if (msg_len > conn->incoming.size() - 4) {
-        return false;
-    }
-
-    uint8_t *msg = conn->incoming.data() + 4;
-    printf("client says: len: %u | msg: %.*s\n", msg_len, 
-           msg_len < 100 ? msg_len : 100, msg);
-    // echo the message back to connection using outgoing buffer
-    conn->outgoing.append((uint8_t *)&msg_len, 4);
-    conn->outgoing.append(msg, msg_len);
-
-    conn->incoming.consume(msg_len + 4);
+    Response res;
+    do_cmd(cmd, res);
+    make_res(conn->outgoing, res);
+    conn->incoming.consume(req_len);
     return true;
 }
 
