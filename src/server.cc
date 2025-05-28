@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 #include <poll.h>
 #include <netdb.h>
@@ -15,6 +16,8 @@
 
 #include <vector>
 
+#include "buffer.h"
+
 const int server_back_log = 10;
 const size_t max_msg_len = 32 << 20;
 
@@ -24,8 +27,8 @@ struct Conn {
     bool want_write = false;
     bool want_close = false;
 
-    std::vector<uint8_t> incoming;
-    std::vector<uint8_t> outgoing;
+    Buffer incoming;
+    Buffer outgoing;
 };
 
 static void sock_set_nonblock(int fd) {
@@ -43,16 +46,6 @@ static void sock_set_nonblock(int fd) {
         perror("fcntl(set flags)");
         abort();
     }
-}
-
-// append chunk to the back
-static void buff_append(std::vector<uint8_t> &dst, uint8_t src[], size_t len) {
-    dst.insert(dst.end(), src, src + len); 
-}
-
-// remove from the front
-static void buff_consume(std::vector<uint8_t> &buff, size_t len) {
-    buff.erase(buff.begin(), buff.begin() + len); 
 }
 
 // 	1. Try to parse accumulated buffer
@@ -78,14 +71,14 @@ static bool try_one_request(Conn *conn) {
         return false;
     }
 
-    uint8_t *msg = &(conn->incoming[4]);
+    uint8_t *msg = conn->incoming.data() + 4;
     printf("client says: len: %u | msg: %.*s\n", msg_len, 
            msg_len < 100 ? msg_len : 100, msg);
     // echo the message back to connection using outgoing buffer
-    buff_append(conn->outgoing, (uint8_t *)&msg_len, 4);
-    buff_append(conn->outgoing, msg, msg_len);
+    conn->outgoing.append((uint8_t *)&msg_len, 4);
+    conn->outgoing.append(msg, msg_len);
 
-    buff_consume(conn->incoming, msg_len + 4);
+    conn->incoming.consume(msg_len + 4);
     return true;
 }
 
@@ -104,10 +97,10 @@ static void handle_write(Conn *conn) {
         conn->want_close = true;
         return; 
     }
-    buff_consume(conn->outgoing, (size_t)bytes_sent);
+    conn->outgoing.consume((size_t)bytes_sent);
 
     // switch back the state
-    if (conn->outgoing.empty()) {
+    if (conn->outgoing.size() == 0) {
         conn->want_read = true;
         conn->want_write = false;
     }
@@ -125,7 +118,7 @@ static void handle_read(Conn *conn) {
         return;
     }
     
-    buff_append(conn->incoming, buff, (size_t)bytes_read);
+    conn->incoming.append(buff, (size_t)bytes_read);
 
     while(try_one_request(conn));
     // switch back the state

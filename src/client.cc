@@ -85,7 +85,7 @@ int main(void) {
 
     std::vector<std::string> query_list = {
         "hello no.1", "hello no.2", "hello no.3",
-        // std::string(k_max_msg, 'x'), // already know it works
+        std::string(k_max_msg, 'x'), // already know it works
         "hello no.4", "hello no.5",
     };
 
