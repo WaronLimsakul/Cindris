@@ -89,6 +89,30 @@ static bool try_one_request(Conn *conn) {
     return true;
 }
 
+// just send what you can
+// remove from the outgoing
+// catch some error
+static void handle_write(Conn *conn) {
+    ssize_t bytes_sent = 
+        send(conn->fd, conn->outgoing.data(), conn->outgoing.size(), 0);
+    // in case client not ready (we use non-block send)
+    if (bytes_sent <= 0 && errno == EAGAIN) {
+        return;
+    }
+    // actual err
+    if (bytes_sent <= 0) {
+        conn->want_close = true;
+        return; 
+    }
+    buff_consume(conn->outgoing, (size_t)bytes_sent);
+
+    // switch back the state
+    if (conn->outgoing.empty()) {
+        conn->want_read = true;
+        conn->want_write = false;
+    }
+}
+
 // 1. Do non-blocking read
 // 2. Add new data to Conn::incoming buffer
 //  we need a buf_append(vec, src, len)
@@ -108,27 +132,12 @@ static void handle_read(Conn *conn) {
     if (conn->outgoing.size() > 0) {
         conn->want_read = false;
         conn->want_write = true;
-    }
-}
 
-// just send what you can
-// remove from the outgoing
-// catch some error
-static bool handle_write(Conn *conn) {
-    ssize_t bytes_sent = 
-        send(conn->fd, conn->outgoing.data(), conn->outgoing.size(), 0);
-    if (bytes_sent <= 0) {
-        conn->want_close = true;
-        return false;
+        // client should be ready to recv after sending requests
+        // in chunk, therefore, we don't wait for next iteration
+        // and just write right away.
+        return handle_write(conn);
     }
-    buff_consume(conn->outgoing, (size_t)bytes_sent);
-
-    // switch back the state
-    if (conn->outgoing.empty()) {
-        conn->want_read = true;
-        conn->want_write = false;
-    }
-    return true;
 }
 
 // 1. accept

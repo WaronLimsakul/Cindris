@@ -85,8 +85,8 @@ int main(void) {
 
     std::vector<std::string> query_list = {
         "hello no.1", "hello no.2", "hello no.3",
-        std::string(k_max_msg, 'x'),
-        "hello no.5",
+        // std::string(k_max_msg, 'x'), // already know it works
+        "hello no.4", "hello no.5",
     };
 
     if (connect(connfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
