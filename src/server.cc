@@ -63,7 +63,6 @@ static void buff_consume(std::vector<uint8_t> &buff, size_t len) {
 // 	4. if not, just left it like that
 static bool try_one_request(Conn *conn) {
     if (conn->incoming.size() < 4) {
-        printf("incoming size: %lu\n", conn->incoming.size());
         return false;
     } 
 
@@ -104,7 +103,7 @@ static void handle_read(Conn *conn) {
     
     buff_append(conn->incoming, buff, (size_t)bytes_read);
 
-    try_one_request(conn);
+    while(try_one_request(conn));
     // switch back the state
     if (conn->outgoing.size() > 0) {
         conn->want_read = false;
