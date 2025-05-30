@@ -19,10 +19,11 @@
 #include <map>
 
 #include "buffer.h"
+#include "hashtable.h"
 
 const int server_back_log = 10;
 const size_t max_msg_len = 32 << 20;
-static std::map<std::string, std::string> cache;
+static Cache g_cache;
 
 struct Conn {
     int fd = -1;
@@ -98,21 +99,96 @@ static ssize_t parse_req(uint8_t *req, size_t buff_len,std::vector<std::string> 
     return bytes_read; // entire len of req
 }
 
+// - The key of this hash is we will have `offset_basis` and `prime`
+// - for every byte in our string, `xor` it with `acc` , which start with `basis`
+// - then `*=` with `prime` 
+// - search google for `basis` and `prime` for FNV hash 
+// - return `acc` (whihc is our hash)
+static uint64_t str_hash(uint8_t *data, size_t len) {
+    uint64_t hash = 0xcbf29ce484222325; // start with offset basis
+    const uint64_t prime = 0x00000100000001b3;
+    for (size_t i = 0; i < len; i++) {
+        hash ^= data[i]; 
+        hash *= prime;
+    }
+    return hash;
+}
+
+static void do_get(std::vector<std::string> &cmd, Response &res) {
+    assert(cmd[0] == "get");
+    // create dummy Entry for look up
+    Entry target_dummy; 
+    target_dummy.key.swap(cmd[1]); // assign use O(N), swap use O(1)
+    target_dummy.node.hashval = str_hash(
+        (uint8_t *)(target_dummy.key.data()), 
+        target_dummy.key.size()
+    );
+
+    HNode *target_node = hm_lookup(&g_cache.map, &target_dummy.node, &entry_eq);
+    if (!target_node) {
+        res.status = RES_NOTFOUND;
+        return;
+    }
+
+    // assign the value + status code to the response
+    res.status = RES_OK;
+    Entry *target_entry = container_of(target_node, Entry, node);
+    std::string target_val = target_entry->value;
+    assert(target_val.size() <= max_msg_len);
+    res.data = (uint8_t *)(target_val.data());
+}
+
+static void do_set(std::vector<std::string> &cmd, Response &res) {
+    // write a dummy for looking up
+    Entry dummy;
+    dummy.key.swap(cmd[1]);
+    dummy.value.swap(cmd[2]);
+    dummy.node.hashval = str_hash(
+        (uint8_t *)dummy.key.data(),
+        dummy.key.size()
+    );
+
+    HNode *target = hm_lookup(&g_cache.map, &dummy.node, &entry_eq);
+    if (!target) {
+        // insert new entry
+        Entry *target_entry = new Entry(dummy);
+        hm_insert(&g_cache.map, &(target_entry->node));
+    } else {
+        Entry *target_entry = container_of(target, Entry, node);
+        target_entry->value.swap(dummy.value); // set value
+    }
+    res.status = RES_OK;
+}
+
+// plan
+// 1. create dummy to lookup
+// 2. hm_delete()
+// 3. set RES_OK;
+static void do_del(std::vector<std::string> &cmd, Response &res) {
+    Entry dummy; 
+    dummy.key.swap(cmd[1]);
+    dummy.node.hashval = str_hash(
+        (uint8_t *)dummy.key.data(), 
+        dummy.key.size()
+    );
+
+    HNode *detached_node = hm_delete(&g_cache.map, &dummy.node, &entry_eq);
+    if (detached_node != NULL) {
+        res.status = RES_OK;
+        Entry *detached_entry = container_of(detached_node, Entry, node);
+        delete detached_entry; // free up allocated entry
+    } else {
+        res.status = RES_NOTFOUND;
+    }
+}
+
 static void do_cmd(std::vector<std::string> cmd, Response &res) {
     if (cmd.size() == 2 && cmd[0] == "get") {
-        auto item = cache.find(cmd[1]);
-        if (item == cache.end()) {
-            res.status = RES_NOTFOUND;
-            return;
-        }
-        std::string &val = item->second; // "first" is the key 
-        res.data = (uint8_t *)val.data(); // overwrite entire data
-        res.data_len = val.size();
+        do_get(cmd, res);
     } else if (cmd.size() == 3 && cmd[0] == "set") {
-        std::string key = cmd[1], val = cmd[2];
-        cache[key].swap(val); // faster than cache[key] = val
+        do_set(cmd, res);
     } else if (cmd.size() == 2 && cmd[0]== "del") {
-        cache.erase(cmd[1]);
+        do_del(cmd, res);
     } else {
         res.status = RES_ERR; // invalid command
         return;
@@ -138,27 +214,6 @@ static bool try_one_request(Conn *conn) {
     if (conn->incoming.size() < 4) {
         return false;
     } 
-    //
-    // uint32_t req_len;
-    // memcpy(&req_len, conn->incoming.data(), 4);
-    // if (req_len > max_msg_len) {
-    //     fprintf(stderr, "msg too long\n");
-    //     conn->want_close = true;
-    //     return false;
-    // }
-    // // messaeg not ready
-    // if (req_len > conn->incoming.size() - 4) {
-    //     return false;
-    // }
-    //
-    // uint8_t *req = conn->incoming.data() + 4;
-    // printf("client says: len: %u | msg: %.*s\n", msg_len, 
-    //        msg_len < 100 ? msg_len : 100, msg);
-    // // echo the message back to connection using outgoing buffer
-    // conn->outgoing.append((uint8_t *)&msg_len, 4);
-    // conn->outgoing.append(msg, msg_len);
-    //
-    // conn->incoming.consume(msg_len + 4);
     uint8_t *req = conn->incoming.data();
     std::vector<std::string> cmd;
     size_t read_buff_size = conn->incoming.size();
