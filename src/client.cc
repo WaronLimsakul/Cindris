@@ -81,8 +81,10 @@ static int32_t recv_res(int connfd) {
             printf("status: invalid status");
     }
 
-    server_msg[msg_len] = '\0';
-    printf(" | message: %s\n", server_msg + 4);
+    if (msg_len > 4) {
+        server_msg[msg_len] = '\0';
+        printf(" | message: %s\n", server_msg + 4);
+    }
     delete[] server_msg;
     return 0;
 }
