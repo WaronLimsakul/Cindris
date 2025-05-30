@@ -20,6 +20,7 @@
 
 #include "buffer.h"
 #include "hashtable.h"
+#include "util.h"
 
 const int server_back_log = 10;
 const size_t max_msg_len = 32 << 20;
@@ -35,11 +36,6 @@ struct Conn {
     Buffer outgoing;
 };
 
-enum StatusCode : uint32_t {
-    RES_OK,
-    RES_NOTFOUND,
-    RES_ERR,
-};
 
 struct Response {
     StatusCode status = RES_OK;
@@ -88,7 +84,7 @@ static ssize_t parse_req(uint8_t *req, size_t buff_len,std::vector<std::string> 
         if (cur_word_len > bytes_left - 4) break;
 
         // push to cmd
-        std::string cur_word = std::string((char *)cursor, cur_word_len);
+        std::string cur_word = std::string((char *)(cursor + 4), cur_word_len);
         cmd.push_back(cur_word);
 
         bytes_read += cur_word_len + 4;
@@ -136,6 +132,7 @@ static void do_get(std::vector<std::string> &cmd, Response &res) {
     std::string target_val = target_entry->value;
     assert(target_val.size() <= max_msg_len);
     res.data = (uint8_t *)(target_val.data());
+    res.data_len = target_val.size();
 }
 
 static void do_set(std::vector<std::string> &cmd, Response &res) {
@@ -193,10 +190,8 @@ static void do_cmd(std::vector<std::string> cmd, Response &res) {
         res.status = RES_ERR; // invalid command
         return;
     }
-    res.status = RES_OK;
 }
 
-// - have `make_res(out_buffer, res)`
 // - write response length first
 // - then write statuscode
 // - then write message
