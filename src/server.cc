@@ -179,6 +179,23 @@ static void do_del(std::vector<std::string> &cmd, Response &res) {
     }
 }
 
+static bool output_key(HNode *node, void *buff_void) {
+    Buffer *buff = (Buffer *)buff_void;
+    Entry *entry = container_of(node, Entry, node);
+    std::string key = entry->key;
+    buff->out_str(key.data(), key.size());
+    return true;
+}
+
+// plan
+// 1. write an array size of how many keys
+// 2. for each node in map, we will output the key
+static void do_keys(Buffer &out) {
+    uint32_t hm_size32 = (uint32_t)hm_size(&g_cache.map);
+    out.out_array(hm_size32);
+    hm_foreach(&g_cache.map, &output_key, (void *)&out);
+}
+
 static void do_cmd(std::vector<std::string> cmd, Response &res) {
     if (cmd.size() == 2 && cmd[0] == "get") {
         do_get(cmd, res);

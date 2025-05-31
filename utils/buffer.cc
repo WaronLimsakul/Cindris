@@ -60,15 +60,80 @@ void Buffer::append(uint8_t src[], size_t len) {
     data_end += len;
 }
 
+// consume data from the front
 void Buffer::consume(size_t len) {
     assert(data_begin + len <= data_end);
     data_begin += len;
+}
+
+void Buffer::consume_back(size_t len) {
+    assert(data_end - len >= data_begin);
+    data_end -= len;
 }
 
 size_t Buffer::size() {
     return data_end - data_begin;
 }
 
-uint8_t Buffer::operator[](int at) {
+// return actual value at data_begin + at
+uint8_t& Buffer::operator[](size_t at) {
     return *(data_begin + at);
 }
+
+void Buffer::out_nil() {
+    uint8_t tag = TAG_NIL;
+    append(&tag, 1);
+}
+
+void Buffer::out_err(ErrorCode code) {
+    uint8_t tag = TAG_ERR;
+    uint8_t code_u8 = code;
+    append(&tag, 1);
+    append(&code_u8, 1);
+}
+
+void Buffer::out_str(char *data, size_t len) {
+    uint8_t tag = TAG_STR;
+    append(&tag, 1);
+    append((uint8_t *)&len, 4);
+    append((uint8_t *)data, len);
+}
+
+void Buffer::out_int(int64_t data) {
+    uint8_t tag = TAG_INT;
+    append(&tag, 1);
+    append((uint8_t *)&data, 8);
+}
+
+void Buffer::out_double(double data) {
+    uint8_t tag = TAG_DBL;
+    append(&tag, 1);
+    append((uint8_t *)&data, sizeof(double));
+}
+
+void Buffer::out_array(uint32_t n) {
+    uint8_t tag = TAG_ARR;
+    append(&tag, 1);
+    append((uint8_t *)&n, 4);
+}
+
+void Buffer::response_begin(size_t &header_pos) {
+    header_pos = size(); // save current position index
+    uint32_t place_holder = 0;
+    append((uint8_t *)&place_holder, 4);
+}
+
+void Buffer::response_end(size_t &header_pos) {
+    size_t msg_len = size() - header_pos - 4;
+    if (msg_len > k_max_msg) {
+        // clear everything and just put ERR_OVERSIZED
+        consume_back(msg_len); 
+        out_err(ERR_OVERSIZED);
+        // add fill in the complete message size
+        uint32_t err_size = 2; // 1 for tag, 1 for code
+        memcpy(data_begin + header_pos, &err_size, 4); 
+        return;
+    }
+    memcpy(data_begin + header_pos, &msg_len, 4);
+}
+

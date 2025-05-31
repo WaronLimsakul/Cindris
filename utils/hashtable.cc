@@ -128,3 +128,31 @@ bool entry_eq(HNode *n1, HNode *n2) {
     Entry *e2 = container_of(n2, Entry, node);
     return e1->key == e2->key;
 }
+
+static size_t h_size(HTable *htab) {
+    if (htab->table == NULL) return 0; 
+    return htab->size;
+}
+    
+size_t hm_size(HMap *map) {
+    return h_size(&map->newer) + h_size(&map->older); 
+}
+
+static bool h_foreach(HTable *htab, bool (* fn)(HNode *, void *), void *arg) {
+    if (htab->table == NULL) return false;
+    size_t slots = htab->mask + 1;
+    assert(slots > 0);
+
+    for (size_t i = 0; i < slots; i++) {
+        for (HNode *cur = htab->table[i]; cur != NULL; cur = cur->next) {
+            if (!fn(cur, arg)) return false;
+        }
+    }
+    return true;
+}
+
+// do the function
+void hm_foreach(HMap *map, bool (* fn)(HNode *, void *), void *arg) {
+    // loop new table, if fail, don't bother the old one
+    h_foreach(&map->newer, fn, arg) && h_foreach(&map->older, fn, arg);  
+}

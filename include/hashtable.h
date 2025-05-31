@@ -40,4 +40,6 @@ HNode *hm_lookup(HMap *map, HNode *node, bool (* eq)(HNode *, HNode *));
 void hm_insert(HMap *map, HNode *node);
 HNode *hm_delete(HMap *map, HNode *node, bool (* eq)(HNode *, HNode *));
 bool entry_eq(HNode *n1, HNode *n2);
+void hm_foreach(HMap *map, bool (* fn)(HNode *, void *), void *);
+size_t hm_size(HMap *map);
 

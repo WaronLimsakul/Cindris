@@ -15,8 +15,6 @@
 
 #include "util.h"
 
-const size_t k_max_msg = 4096;
-
 // plan
 // 1. init write_buff with k_max_msg len
 // 2. write how many word to buff + update offset
