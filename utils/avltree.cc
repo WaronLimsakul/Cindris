@@ -1,19 +1,12 @@
 #include <stddef.h>
 #include "avltree.h"
 
-// NULl-safe
-static uint32_t avl_height(AVLNode *node) {
-    return node ? node->height : 0; 
-}
-
-static uint32_t max(uint32_t a, uint32_t b) {
-    return a > b ? a : b;
-}
 
 // update the height
 static void avl_update(AVLNode *node) {
     if (!node) return;
     node->height = max(avl_height(node->left), avl_height(node->right)) + 1;
+    node->count = avl_count(node->left) + avl_count(node->right) + 1;
 }
 
 static AVLNode *rotate_left(AVLNode *node) {
