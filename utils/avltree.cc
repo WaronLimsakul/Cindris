@@ -1,7 +1,8 @@
+#include <stddef.h>
 #include "avltree.h"
 
 // NULl-safe
-static uint32_h avl_height(AVLNode *node) {
+static uint32_t avl_height(AVLNode *node) {
     return node ? node->height : 0; 
 }
 
@@ -77,7 +78,7 @@ static AVLNode *avl_fix_right(AVLNode *node) {
 // - Propagate auxiliary data.
 // - Fix imbalances.
 // - Return the new root node.
-static AVLNode *avl_fix(AVLNode *node) {
+AVLNode *avl_fix(AVLNode *node) {
     AVLNode *prev = NULL;
     for (AVLNode *cur = node; cur != NULL; cur = cur->parent) {
         AVLNode *parent = cur->parent;
@@ -103,4 +104,49 @@ static AVLNode *avl_fix(AVLNode *node) {
         prev = *to_update; // we want return new root node
     }
     return prev;
+}
+
+static AVLNode *avl_del_easy(AVLNode *node) {
+    AVLNode *new_node = node->left != NULL ? node->left : node->right;
+    AVLNode *parent = node->parent;
+    if (new_node) {
+        new_node->parent = parent;
+    }
+
+    // if root, return new root
+    if (!parent) {
+        return new_node; 
+    }
+
+    AVLNode **from = parent->left == node ? &parent->left : &parent->right;
+    *from = new_node;
+    return avl_fix(parent);
+}
+
+AVLNode *avl_del(AVLNode *node) {
+    if (!node->left || !node->right) {
+        return avl_del_easy(node);
+    }
+
+    AVLNode *right_node = node->right;
+    AVLNode *successor = right_node;
+    while (successor->left) {
+        successor = successor->left;
+    }
+
+    AVLNode *new_root = avl_del_easy(successor);
+    *successor = *node;    
+    if (successor->left) {
+        successor->left->parent = successor;
+    }
+    if (successor->right) {
+        successor->right->parent = successor;
+    }
+    AVLNode *parent = node->parent;
+    if (parent) {
+        AVLNode **from = parent->left == node ? &parent->left : &parent->right;
+        *from = successor;
+    }
+
+    return new_root;
 }
