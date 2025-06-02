@@ -4,14 +4,11 @@
 #include <set>
 
 #include "avltree.h"
+#include "common.h"
 
 // Generate test cases with code.
 // Verify data structure properties and invariants.
 // Compare to a reference data structure such as std::set.
-
-#define container_of(ptr, type, member) ({                  \
-    const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-    (type *)( (char *)__mptr - offsetof(type, member) );})
 
 struct Data {
     AVLNode node;

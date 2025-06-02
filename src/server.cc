@@ -95,20 +95,6 @@ static ssize_t parse_req(uint8_t *req, size_t buff_len,std::vector<std::string> 
     return bytes_read; // entire len of req
 }
 
-// - The key of this hash is we will have `offset_basis` and `prime`
-// - for every byte in our string, `xor` it with `acc` , which start with `basis`
-// - then `*=` with `prime` 
-// - search google for `basis` and `prime` for FNV hash 
-// - return `acc` (whihc is our hash)
-static uint64_t str_hash(uint8_t *data, size_t len) {
-    uint64_t hash = 0xcbf29ce484222325; // start with offset basis
-    const uint64_t prime = 0x00000100000001b3;
-    for (size_t i = 0; i < len; i++) {
-        hash ^= data[i]; 
-        hash *= prime;
-    }
-    return hash;
-}
 
 static void do_get(std::vector<std::string> &cmd, Response &res) {
     assert(cmd[0] == "get");

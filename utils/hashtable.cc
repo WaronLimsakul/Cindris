@@ -2,11 +2,27 @@
 #include <stdlib.h>
 
 #include "hashtable.h"
+#include "common.h"
 
 
 // chaining hash table allow > 1 load factor
 const size_t max_load_factor = 4;
 const size_t rehash_work = 128;
+
+// - The key of this hash is we will have `offset_basis` and `prime`
+// - for every byte in our string, `xor` it with `acc` , which start with `basis`
+// - then `*=` with `prime` 
+// - search google for `basis` and `prime` for FNV hash 
+// - return `acc` (whihc is our hash)
+uint64_t str_hash(uint8_t *data, size_t len) {
+    uint64_t hash = 0xcbf29ce484222325; // start with offset basis
+    const uint64_t prime = 0x00000100000001b3;
+    for (size_t i = 0; i < len; i++) {
+        hash ^= data[i]; 
+        hash *= prime;
+    }
+    return hash;
+}
 
 static void h_init(HTable *htab, size_t num_slots) {
     // check n = 2^k
@@ -26,6 +42,8 @@ static void h_insert(HTable *htab, HNode *node) {
     htab->size++;
 }
 
+// 1. use the hashval of the target to go to target slot
+// 2. traverse the chain and compare using eq(cur, target)
 static HNode **h_lookup(HTable *htab, HNode *target, bool (* eq)(HNode *, HNode *)) {
     if (!htab || !htab->table) return NULL;
 

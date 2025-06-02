@@ -2,10 +2,6 @@
 #include <stdint.h>
 #include <string>
 
-// for intrusive node
-#define container_of(ptr, T, field) \
-    (T *)((char *)ptr - offsetof(T, field))
-
 struct HNode {
     struct HNode *next = NULL;
     uint64_t hashval = 0;
@@ -43,3 +39,5 @@ bool entry_eq(HNode *n1, HNode *n2);
 void hm_foreach(HMap *map, bool (* fn)(HNode *, void *), void *);
 size_t hm_size(HMap *map);
 
+// for hashing anything
+uint64_t str_hash(uint8_t *data, size_t len);
