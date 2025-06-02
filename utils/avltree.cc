@@ -2,7 +2,7 @@
 #include "avltree.h"
 
 
-// update the height
+// update the height and count
 static void avl_update(AVLNode *node) {
     if (!node) return;
     node->height = max(avl_height(node->left), avl_height(node->right)) + 1;
@@ -25,6 +25,10 @@ static AVLNode *rotate_left(AVLNode *node) {
     new_node->parent = parent;
     new_node->left = node;
     node->parent = new_node;
+
+    // update at the end (node first because it's below new_node)
+    avl_update(node);
+    avl_update(new_node);
     return new_node; // so we can update parent's child
 }
 
@@ -46,8 +50,8 @@ static AVLNode *rotate_right(AVLNode *node) {
     node->parent = new_node;
 
     // update height
-    avl_update(new_node);
     avl_update(node);
+    avl_update(new_node);
     return new_node; // so we can update parent's child
 }
 
@@ -61,7 +65,7 @@ static AVLNode *avl_fix_left(AVLNode *node) {
 
 // for a node, if the h_right - h_left = 2, we call this function 
 static AVLNode *avl_fix_right(AVLNode *node) {
-    if (avl_height(node->left->left) > avl_height(node->left->right)) {
+    if (avl_height(node->right->left) > avl_height(node->right->right)) {
         node->right = rotate_right(node->right);
     } 
     return rotate_left(node);
@@ -94,12 +98,15 @@ AVLNode *avl_fix(AVLNode *node) {
         } else if (hleft - hright == 2) {
             *to_update = avl_fix_left(cur);
         }
-        prev = *to_update; // we want return new root node
+        prev = *to_update; // we want to return new root node
     }
     return prev;
 }
 
+// delete target node and return a new root
 static AVLNode *avl_del_easy(AVLNode *node) {
+    assert(!node->left || !node->right);
+
     AVLNode *new_node = node->left != NULL ? node->left : node->right;
     AVLNode *parent = node->parent;
     if (new_node) {
@@ -117,29 +124,38 @@ static AVLNode *avl_del_easy(AVLNode *node) {
 }
 
 AVLNode *avl_del(AVLNode *node) {
+    // easy case
     if (!node->left || !node->right) {
         return avl_del_easy(node);
     }
 
-    AVLNode *right_node = node->right;
-    AVLNode *successor = right_node;
+    // find sucessor
+    AVLNode *successor = node->right;
     while (successor->left) {
         successor = successor->left;
     }
 
-    AVLNode *new_root = avl_del_easy(successor);
+    // detach successor
+    AVLNode *root = avl_del_easy(successor);
+
+    // update successor's fields 
     *successor = *node;    
+
+    // update its relative
     if (successor->left) {
         successor->left->parent = successor;
     }
     if (successor->right) {
         successor->right->parent = successor;
     }
-    AVLNode *parent = node->parent;
-    if (parent) {
-        AVLNode **from = parent->left == node ? &parent->left : &parent->right;
-        *from = successor;
-    }
 
-    return new_root;
+    // update new_node's parent. If node is root, then we update the root
+    AVLNode *parent = node->parent;
+    AVLNode **from = &root;
+    if (parent) {
+        from = parent->left == node ? &parent->left : &parent->right;
+    }
+    *from = successor;
+    
+    return root;
 }

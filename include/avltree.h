@@ -6,7 +6,7 @@ struct AVLNode {
     AVLNode *parent = NULL;
     AVLNode *left = NULL;
     AVLNode *right = NULL;
-    uint32_t height = 0;
+    uint32_t height = 0; // len of longest path from leaf to that node
     uint32_t count = 0; // # nodes in subtree
 };
 

@@ -33,6 +33,7 @@ struct Tree {
 static void tree_add(Tree &t, uint32_t val) {
     Data *new_data = new Data{}; 
     new_data->data = val;
+    avl_init(&new_data->node);
     
     AVLNode **from = &t.root;
     AVLNode *cur = NULL;
@@ -95,12 +96,12 @@ static void avl_verify(AVLNode *parent, AVLNode *node) {
     if (node->left) {
         assert(node->left->parent == node);
         uint32_t left_data = container_of(node->left, Data, node)->data;
-        assert(left_data < node_data);
+        assert(left_data <= node_data);
     }
     if (node->right) {
         assert(node->right->parent == node);
         uint32_t right_data = container_of(node->right, Data, node)->data;
-        assert(right_data < node_data);
+        assert(right_data >= node_data);
     }
 }
 
@@ -120,7 +121,9 @@ static void extract(AVLNode *node, std::multiset<uint32_t> &extracted) {
 // cons: verify if the tree is effectively equal to the ref
 static void tree_verify(Tree &t, const std::multiset<uint32_t> &ref) {
     avl_verify(NULL, t.root); 
-    assert(t.root->count == ref.size());
+    if (t.root) {
+        assert(t.root->count == ref.size());
+    }
     std::multiset<uint32_t> extracted;
     extract(t.root, extracted);
     assert(extracted == ref);
@@ -202,7 +205,7 @@ static void test_del(uint32_t size) {
 
 // Arrange-Act-Assert
 int main(void) {
-    Tree tree;
+    Tree tree = Tree{};
     
     // stage 1: basic test
     tree_verify(tree, {}); // quick way to init empty container
