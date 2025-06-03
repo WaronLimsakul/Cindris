@@ -211,6 +211,7 @@ static AVLNode *predecessor(AVLNode *node) {
 // note: if offset is outbound, we return NULL
 // we use .count to augment the tree. O(log n) runtime
 AVLNode *avl_offset(AVLNode *node, int64_t offset) {
+    assert(node);
     int64_t diff = 0;
     while (diff != offset) {
         int64_t diff_needed = offset - diff;
@@ -244,4 +245,31 @@ AVLNode *avl_offset(AVLNode *node, int64_t offset) {
         }
     }
     return node;
+}
+
+// receive the avl node, return its absolute rank in order
+// plan: we want to know where is this node compare to right most (no.1)
+int64_t avl_rank(AVLNode *node) {
+    assert(node);
+    int64_t rank = 0; // compare node_rank - cur_rank
+
+    // 1. go up until root and accumulate rank
+    while(node->parent) {
+        if (node->parent->left == node) {
+            rank += avl_count(node->right) + 1;
+        } else {
+            rank -= avl_count(node->left) + 1;
+        }
+        node = node->parent;
+    }
+
+    // 2. from root, always go down right until NULL
+    while(node->right) {
+        rank += avl_count(node->right->left) + 1;
+        node = node->right;
+    }
+
+    // 3. now we have rank = rightmost_rank - cur_rank
+    //  but the rightmost rank is #1
+    return rank + 1;
 }
