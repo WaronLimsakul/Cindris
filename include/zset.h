@@ -18,13 +18,25 @@ struct ZNode {
 };
 
 // helper struct for comparing HNode
-static struct HKey {
+struct HKey {
     HNode hnode;
     size_t len;
-    char *name;
-}
+    const char *name;
+};
 
 // just insert a new data into our set. return false if data already exist
 bool zset_insert(ZSet *zset, const char *name, size_t len, double score);
+
+// just hashmap look up using tuple comparison
 ZNode *zset_lookup(ZSet *zset, const char *name, size_t len); // look up by name
+
+// receive a zset and (can be dummy) znode => delete it from zset + free memory
 void zset_delete(ZSet *zset, ZNode *node); // delete from complete node
+
+// tree search from zset using (score, name) to find first pair where >= (score, name)
+ZNode *zset_seekge(ZSet *zset, double score, const char *name, size_t len);
+
+// receive a znode and offset, return the forward or 
+// backward offset znode* depends on offset.
+ZNode *znode_offset(ZNode *znode, size_t offset);
+

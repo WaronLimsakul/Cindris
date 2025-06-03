@@ -1,4 +1,6 @@
 #include <stddef.h>
+
+#include "common.h"
 #include "avltree.h"
 
 
@@ -158,4 +160,65 @@ AVLNode *avl_del(AVLNode *node) {
     *from = successor;
     
     return root;
+}
+
+// return the next node in order
+static AVLNode *successor(AVLNode *node) {
+    assert(node);
+    // if has right, return left most in the right sub-tree
+    if (node->right) {
+        AVLNode *cur = node->right;           
+        while (cur->left != NULL) {
+            cur = cur->left;
+        }
+        return cur;
+    } 
+    // if has no right, it might be in left sub-tree, traverse to get the parent 
+    for (AVLNode *cur = node; cur != NULL; cur = cur->parent) {
+        AVLNode *parent = cur->parent;
+        if (parent->left == cur) {
+            return parent;
+        }
+    }
+    // it is at the most value node
+    return NULL;
+}
+
+// return thet node before in order
+static AVLNode *predecessor(AVLNode *node) {
+    assert(node); 
+    // if has left, return right most in the left sub-tre
+    if (node->left) {
+        AVLNode *cur = node->left;
+        while (cur->right != NULL) {
+            cur = cur->left;
+        }
+        return cur;
+    }
+    // if has no left, it still might be in right sub-tree
+    for (AVLNode *cur = node; cur != NULL; cur = cur->parent) {
+        AVLNode *parent = cur->parent;
+        if (parent->right == cur) {
+            return parent;
+        }
+    }
+    // it is least value node
+    return NULL;
+}
+
+// receive node and offset (can be + or -)
+// then count the node forward or backward, return the result
+// note: if offset is outbound, we return NULL
+AVLNode *avl_offset(AVLNode *node, int64_t offset) {
+    assert(node);
+    // positive case: stop at 0 (don't get into next loop)
+    for (; offset > 0 && node != NULL; offset--) {
+        node = successor(node);
+    }
+    // negative case 
+    for (; offset < 0 && node != NULL; offset++) {
+        node = predecessor(node);
+    }
+    // if offset = 0, just fall through until here
+    return node; 
 }

@@ -83,6 +83,7 @@ HNode *hm_lookup(HMap *map, HNode *target, bool (* eq)(HNode *, HNode *)) {
     return res != NULL ? *res : NULL;
 }
 
+// detach the target node (can be dummy) from map and return detached node 
 HNode *hm_delete(HMap *map, HNode *target, bool(* eq)(HNode *, HNode *)) {
     HNode **target_ptr = h_lookup(&map->newer, target, eq);
     if ((target_ptr == h_lookup(&map->newer, target, eq)) != NULL) {

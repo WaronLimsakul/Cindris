@@ -75,6 +75,10 @@ size_t Buffer::size() {
     return data_end - data_begin;
 }
 
+uint8_t& Buffer::at(size_t idx) {
+    return *(data_begin + idx);
+}
+
 // return actual value at data_begin + at
 uint8_t& Buffer::operator[](size_t at) {
     return *(data_begin + at);
@@ -115,6 +119,21 @@ void Buffer::out_array(uint32_t n) {
     uint8_t tag = TAG_ARR;
     append(&tag, 1);
     append((uint8_t *)&n, 4);
+}
+
+// begin array header, return the header idx for arr_end
+size_t Buffer::arr_begin() {
+    uint8_t tag = TAG_ARR;
+    append(&tag, 1);
+    uint32_t placeholder = 0;
+    append((uint8_t *)&placeholder, 4);
+    return size() - 4;
+}
+
+// complete the array header
+void Buffer::arr_end(size_t arr_header_idx, uint32_t num_els) {
+    assert(this->at(arr_header_idx - 1) == TAG_ARR); 
+    memcpy(data() + arr_header_idx, &num_els, 4);
 }
 
 void Buffer::response_begin(size_t &header_pos) {

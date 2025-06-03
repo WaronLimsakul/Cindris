@@ -20,6 +20,7 @@ public:
     void append(uint8_t src[], size_t len); 
     void consume(size_t len); 
     size_t size(); 
+    uint8_t& at(size_t idx);
     uint8_t& operator[](size_t at); 
 
     void out_nil();
@@ -27,7 +28,13 @@ public:
     void out_str(char * data, size_t len);
     void out_int(int64_t data);
     void out_double(double data);
+
+    // use this when you sure how many elements you want to send
     void out_array(uint32_t n);
+
+    // use this when you not sure how many elements to sent
+    size_t arr_begin();
+    void arr_end(size_t arr_header_idx, uint32_t num_els);
 
     void response_begin(size_t &header_pos);
     void response_end(size_t &header_pos);

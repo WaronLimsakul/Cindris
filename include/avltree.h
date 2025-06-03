@@ -27,13 +27,14 @@ inline uint32_t avl_count(AVLNode *node) {
     return node ? node->count : 0; 
 }
 
-inline uint32_t max(uint32_t a, uint32_t b) {
-    return a > b ? a : b;
-}
-
 // called on the parent node after an insert to restore balance
 AVLNode *avl_fix(AVLNode *node);
 
-// detach a node, this already use avl_fix
+// detach a node from its tree, this already use avl_fix
 AVLNode *avl_del(AVLNode *node); 
+
+// receive node and offset (can be + or -)
+// then count the node forward or backward, return the result
+// note: if offset is outbound, we return NULL
+AVLNode *avl_offset(AVLNode *node, int64_t offset);
 

@@ -18,6 +18,7 @@
 #include <string>
 #include <map>
 
+#include "common.h"
 #include "buffer.h"
 #include "hashtable.h"
 #include "util.h"
@@ -180,6 +181,14 @@ static void do_keys(Buffer &out) {
     uint32_t hm_size32 = (uint32_t)hm_size(&g_cache.map);
     out.out_array(hm_size32);
     hm_foreach(&g_cache.map, &output_key, (void *)&out);
+}
+
+//  receive command = ZQUERY key score name offset limit
+//  1. Seek to the first pair where pair >= (score, name).
+//  2. Walk to the n-th successor/predecessor (offset).
+//  3. Iterate and output.
+static void do_zquery(std::vector<std::string> cmd, Buffer &out) {
+
 }
 
 static void do_cmd(std::vector<std::string> cmd, Response &res) {
