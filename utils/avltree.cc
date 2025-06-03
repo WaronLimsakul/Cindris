@@ -207,18 +207,41 @@ static AVLNode *predecessor(AVLNode *node) {
 }
 
 // receive node and offset (can be + or -)
-// then count the node forward or backward, return the result
+// then count the node forward or backward depends on offset, return the result
 // note: if offset is outbound, we return NULL
+// we use .count to augment the tree. O(log n) runtime
 AVLNode *avl_offset(AVLNode *node, int64_t offset) {
-    assert(node);
-    // positive case: stop at 0 (don't get into next loop)
-    for (; offset > 0 && node != NULL; offset--) {
-        node = successor(node);
+    int64_t diff = 0;
+    while (diff != offset) {
+        int64_t diff_needed = offset - diff;
+        if (diff_needed > 0 && diff_needed <= avl_count(node->right)) {
+            // going to left child
+            assert(node->right);
+            diff += (avl_count(node->right->left) + 1);
+            node = node->right;
+        } else if (diff_needed < 0 && -diff_needed <= avl_count(node->left)) {
+            // going to right child
+            assert(node->left);
+            diff -= (avl_count(node->left->right) + 1);
+            node = node->left;
+        } else {
+            // going to parent
+
+            if (!node->parent) return NULL;
+
+            // if we want to go left but we're left child, we can't
+            // same thing with right.
+            bool left_child = node->parent->left == node;
+            if (diff_needed > 0 && !left_child) return NULL;
+            if (diff_needed < 0 && left_child) return NULL;
+
+            if (left_child) {
+                diff += avl_count(node->right) + 1;
+            } else {
+                diff -= avl_count(node->left) + 1;
+            }
+            node = node->parent;
+        }
     }
-    // negative case 
-    for (; offset < 0 && node != NULL; offset++) {
-        node = predecessor(node);
-    }
-    // if offset = 0, just fall through until here
-    return node; 
+    return node;
 }
