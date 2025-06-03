@@ -109,7 +109,7 @@ void Buffer::out_int(int64_t data) {
     append((uint8_t *)&data, 8);
 }
 
-void Buffer::out_double(double data) {
+void Buffer::out_dbl(double data) {
     uint8_t tag = TAG_DBL;
     append(&tag, 1);
     append((uint8_t *)&data, sizeof(double));

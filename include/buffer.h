@@ -27,7 +27,7 @@ public:
     void out_err(ErrorCode code);
     void out_str(char * data, size_t len);
     void out_int(int64_t data);
-    void out_double(double data);
+    void out_dbl(double data);
 
     // use this when you sure how many elements you want to send
     void out_array(uint32_t n);

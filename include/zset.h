@@ -34,6 +34,7 @@ ZNode *zset_lookup(ZSet *zset, const char *name, size_t len); // look up by name
 void zset_delete(ZSet *zset, ZNode *node); // delete from complete node
 
 // tree search from zset using (score, name) to find first pair where >= (score, name)
+// (ge stands for greater than or equal btw)
 ZNode *zset_seekge(ZSet *zset, double score, const char *name, size_t len);
 
 // receive a znode and offset, return the forward or 

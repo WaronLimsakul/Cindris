@@ -1,3 +1,4 @@
+// Clib
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,6 +6,7 @@
 #include <string.h>
 #include <assert.h>
 
+// syscall
 #include <poll.h>
 #include <netdb.h>
 #include <unistd.h>
@@ -14,18 +16,23 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 
+// C++ STL
 #include <vector>
 #include <string>
 #include <map>
 
+// my modules
+#include "util.h"
 #include "common.h"
 #include "buffer.h"
 #include "hashtable.h"
-#include "util.h"
+#include "zset.h"
 
 const int server_back_log = 10;
 const size_t max_msg_len = 32 << 20;
 static Cache g_cache;
+
+static ZSet zset;
 
 struct Conn {
     int fd = -1;
@@ -187,7 +194,34 @@ static void do_keys(Buffer &out) {
 //  1. Seek to the first pair where pair >= (score, name).
 //  2. Walk to the n-th successor/predecessor (offset).
 //  3. Iterate and output.
-static void do_zquery(std::vector<std::string> cmd, Buffer &out) {
+static void do_zquery(std::vector<std::string> &cmd, Buffer &out) {
+    assert(cmd.size() == 6); 
+    assert(cmd[0] == "ZQUERY");
+
+    // parse the score
+    double score = std::stod(cmd[2]);
+    char *name = cmd[3].data();
+    size_t name_len = cmd[3].size();
+    int64_t offset = std::stoll(cmd[4]);
+    int64_t limit = std::stoll(cmd[5]);
+
+    // seek the first pair where pair >= (score, name)
+    ZNode *znode = zset_seekge(&zset, score, name, name_len);
+
+    // walk to offset
+    znode = znode_offset(znode, offset);
+
+    // output start from znode -> walk forward until limit
+    size_t arr_head_idx = out.arr_begin();
+    int64_t num_nodes = 0;
+    for (; znode && num_nodes < limit; num_nodes++) {
+        out.out_str(znode->name, znode->len);
+        out.out_dbl(znode->score);
+        znode = znode_offset(znode, 1);
+    }
+
+    // #elements = #num
+    out.arr_end(arr_head_idx, num_nodes * 2);
 
 }
 
